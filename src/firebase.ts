@@ -1,0 +1,94 @@
+import { initializeApp } from 'firebase/app';
+import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from 'firebase/auth';
+import { getFirestore, collection, addDoc, serverTimestamp, query, orderBy, onSnapshot, doc, setDoc, getDocFromServer } from 'firebase/firestore';
+
+// Prioritize environment variables for Netlify/Production, fallback to local JSON for development
+const firebaseConfig = {
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  firestoreDatabaseId: import.meta.env.VITE_FIREBASE_DATABASE_ID || '(default)'
+};
+
+// If environment variables are missing, try to load from the local config file (for AI Studio preview)
+let finalConfig = firebaseConfig;
+if (!firebaseConfig.apiKey) {
+  try {
+    // @ts-ignore
+    const localConfig = await import('../firebase-applet-config.json');
+    finalConfig = {
+      apiKey: localConfig.apiKey,
+      authDomain: localConfig.authDomain,
+      projectId: localConfig.projectId,
+      appId: localConfig.appId,
+      firestoreDatabaseId: localConfig.firestoreDatabaseId
+    };
+  } catch (e) {
+    console.error("Firebase configuration missing. Please set VITE_FIREBASE_* environment variables.");
+  }
+}
+
+const app = initializeApp(finalConfig);
+export const auth = getAuth(app);
+export const db = getFirestore(app, finalConfig.firestoreDatabaseId);
+export const googleProvider = new GoogleAuthProvider();
+
+// Error handling helper
+export enum OperationType {
+  CREATE = 'create',
+  UPDATE = 'update',
+  DELETE = 'delete',
+  LIST = 'list',
+  GET = 'get',
+  WRITE = 'write',
+}
+
+export interface FirestoreErrorInfo {
+  error: string;
+  operationType: OperationType;
+  path: string | null;
+  authInfo: {
+    userId: string | undefined;
+    email: string | null | undefined;
+    emailVerified: boolean | undefined;
+    isAnonymous: boolean | undefined;
+  }
+}
+
+export function isQuotaError(error: any) {
+  return (
+    error?.code === 'resource-exhausted' || 
+    error?.message?.includes('Quota exceeded') ||
+    error?.message?.includes('INTERNAL ASSERTION FAILED')
+  );
+}
+
+export function handleFirestoreError(error: any, operationType: OperationType, path: string | null) {
+  if (isQuotaError(error)) return;
+
+  const errInfo: FirestoreErrorInfo = {
+    error: error instanceof Error ? error.message : String(error),
+    authInfo: {
+      userId: auth.currentUser?.uid,
+      email: auth.currentUser?.email,
+      emailVerified: auth.currentUser?.emailVerified,
+      isAnonymous: auth.currentUser?.isAnonymous,
+    },
+    operationType,
+    path
+  };
+  console.error('Firestore Error: ', JSON.stringify(errInfo));
+  throw new Error(JSON.stringify(errInfo));
+}
+
+async function testConnection() {
+  try {
+    await getDocFromServer(doc(db, 'test', 'connection'));
+  } catch (error) {
+    if (error instanceof Error && error.message.includes('the client is offline')) {
+      console.error("Please check your Firebase configuration.");
+    }
+  }
+}
+testConnection();

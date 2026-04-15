@@ -1,0 +1,87 @@
+{
+  "entities": {
+    "Registration": {
+      "title": "Registration",
+      "description": "A registration of a section responsible",
+      "type": "object",
+      "properties": {
+        "personName": { "type": "string" },
+        "phoneNumber": { "type": "string" },
+        "ineFrontUrl": { "type": "string" },
+        "ineBackUrl": { "type": "string" },
+        "sectionId": { "type": "string" },
+        "sectionName": { "type": "string" },
+        "responsibleId": { "type": "string" },
+        "responsibleEmail": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["personName", "sectionId", "responsibleId"]
+    },
+    "User": {
+      "title": "User",
+      "description": "A user of the system",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string" },
+        "displayName": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "role": { "type": "string", "enum": ["admin", "user"] }
+      }
+    },
+    "Section": {
+      "title": "Section",
+      "description": "A territorial section",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "order": { "type": "number" },
+        "files": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" },
+              "url": { "type": "string" },
+              "type": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "Settings": {
+      "title": "Settings",
+      "description": "Global UI settings",
+      "type": "object",
+      "properties": {
+        "primaryColor": { "type": "string" },
+        "backgroundColor": { "type": "string" },
+        "fontFamily": { "type": "string" },
+        "appIcon": { "type": "string" },
+        "logoUrl": { "type": "string" },
+        "dashboardOrder": { "type": "array", "items": { "type": "string" } },
+        "sidebarOrder": { "type": "array", "items": { "type": "string" } },
+        "headerLayout": { "type": "array", "items": { "type": "string" } },
+        "loginOrder": { "type": "array", "items": { "type": "string" } }
+      }
+    }
+  },
+  "firestore": {
+    "/registrations/{registrationId}": {
+      "schema": "Registration",
+      "description": "Collection of section responsible registrations"
+    },
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "Collection of user profiles and roles"
+    },
+    "/sections/{sectionId}": {
+      "schema": "Section",
+      "description": "Collection of territorial sections and resources"
+    },
+    "/settings/global": {
+      "schema": "Settings",
+      "description": "Global application configuration"
+    }
+  }
+}
