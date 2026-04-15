@@ -5,7 +5,7 @@ import { toast } from 'sonner';
 import { UserPlus, History, User as UserIcon, MapPin, Phone, Camera, X, Rocket } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { FALLBACK_SECTIONS } from '../constants/sections';
 
 export default function Dashboard({ user, isAdmin }: { user: any, isAdmin: boolean }) {
@@ -19,6 +19,7 @@ export default function Dashboard({ user, isAdmin }: { user: any, isAdmin: boole
   const [sections, setSections] = useState<any[]>(FALLBACK_SECTIONS);
   const [dashboardOrder, setDashboardOrder] = useState(['welcome', 'form', 'activity']);
   const [registrationCount, setRegistrationCount] = useState(0);
+  const [selectedRegistration, setSelectedRegistration] = useState<any>(null);
   const TOTAL_SECTIONS = 188;
 
   useEffect(() => {
@@ -284,13 +285,20 @@ export default function Dashboard({ user, isAdmin }: { user: any, isAdmin: boole
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {recentRegistrations.length === 0 ? <p className="text-neutral-400 text-center py-10 italic col-span-full">No hay registros</p> : 
                   recentRegistrations.map(reg => (
-                    <div key={reg.id} className="p-4 rounded-2xl bg-neutral-50 border border-neutral-100 space-y-2">
+                    <button 
+                      key={reg.id} 
+                      onClick={() => setSelectedRegistration(reg)}
+                      className="p-4 rounded-2xl bg-neutral-50 border border-neutral-100 space-y-2 text-left hover:border-indigo-300 transition-colors group"
+                    >
                       <div className="flex justify-between items-start">
-                        <div className="flex items-center gap-2"><UserIcon className="w-4 h-4 text-neutral-400" /><span className="font-bold text-neutral-800">{reg.personName}</span></div>
+                        <div className="flex items-center gap-2">
+                          <UserIcon className="w-4 h-4 text-neutral-400 group-hover:text-indigo-500" />
+                          <span className="font-bold text-neutral-800">{reg.personName}</span>
+                        </div>
                         <span className="text-[10px] uppercase font-bold text-neutral-400">{reg.createdAt?.toDate ? format(reg.createdAt.toDate(), 'HH:mm', { locale: es }) : 'Ahora'}</span>
                       </div>
                       <div className="flex items-center gap-2 text-sm text-neutral-600"><MapPin className="w-4 h-4 text-indigo-500" /><span>{reg.sectionName}</span></div>
-                    </div>
+                    </button>
                   ))
                 }
               </div>
@@ -298,6 +306,85 @@ export default function Dashboard({ user, isAdmin }: { user: any, isAdmin: boole
           )}
         </React.Fragment>
       ))}
+
+      {/* Modal de Detalles */}
+      <AnimatePresence>
+        {selectedRegistration && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white rounded-3xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl"
+            >
+              <div className="sticky top-0 bg-white/80 backdrop-blur-md p-6 border-b border-neutral-100 flex justify-between items-center z-10">
+                <h3 className="text-xl font-bold text-neutral-900">Detalles del Registro</h3>
+                <button onClick={() => setSelectedRegistration(null)} className="p-2 hover:bg-neutral-100 rounded-full transition-colors">
+                  <X className="w-6 h-6 text-neutral-400" />
+                </button>
+              </div>
+              
+              <div className="p-8 space-y-8">
+                {/* Info Responsable de Sección */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-1">
+                    <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest">Responsable de Sección</span>
+                    <p className="text-lg font-bold text-neutral-900">{selectedRegistration.personName}</p>
+                    <div className="flex items-center gap-2 text-neutral-600">
+                      <Phone className="w-4 h-4" />
+                      <span>{selectedRegistration.phoneNumber}</span>
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest">Sección</span>
+                    <div className="flex items-center gap-2 text-indigo-600 font-bold">
+                      <MapPin className="w-4 h-4" />
+                      <span>{selectedRegistration.sectionName}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Quien lo designó */}
+                <div className="p-4 bg-indigo-50 rounded-2xl border border-indigo-100">
+                  <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest">Designado por</span>
+                  <p className="text-sm font-bold text-indigo-900">{selectedRegistration.responsibleEmail}</p>
+                  <p className="text-[10px] text-indigo-400 mt-1">
+                    Fecha: {selectedRegistration.createdAt?.toDate ? format(selectedRegistration.createdAt.toDate(), "PPPP 'a las' p", { locale: es }) : 'N/A'}
+                  </p>
+                </div>
+
+                {/* Fotos INE */}
+                <div className="space-y-4">
+                  <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest">Documentación (INE)</span>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <p className="text-xs font-bold text-neutral-500">Frontal</p>
+                      <div className="aspect-video rounded-2xl overflow-hidden border border-neutral-200 bg-neutral-100">
+                        <img src={selectedRegistration.ineFrontUrl} alt="INE Frontal" className="w-full h-full object-contain" />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <p className="text-xs font-bold text-neutral-500">Reverso</p>
+                      <div className="aspect-video rounded-2xl overflow-hidden border border-neutral-200 bg-neutral-100">
+                        <img src={selectedRegistration.ineBackUrl} alt="INE Reverso" className="w-full h-full object-contain" />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-6 border-t border-neutral-100 flex justify-end">
+                <button 
+                  onClick={() => setSelectedRegistration(null)}
+                  className="px-6 py-2 bg-neutral-900 text-white rounded-xl font-bold text-sm hover:bg-neutral-800 transition-colors"
+                >
+                  Cerrar
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

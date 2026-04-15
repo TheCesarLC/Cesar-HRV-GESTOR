@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { db, isQuotaError } from '../firebase';
-import { doc, onSnapshot, collection, query, where, limit } from 'firebase/firestore';
+import { doc, onSnapshot, collection, query, where, limit, getDoc } from 'firebase/firestore';
 import { ChevronLeft, MapPin, User, Phone, FileText, ExternalLink, Image as ImageIcon, Video, FileSpreadsheet, Link as LinkIcon, LifeBuoy, Download, Eye, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { FALLBACK_SECTIONS } from '../constants/sections';
 
 export default function SectionDetail() {
   const { sectionId } = useParams();
@@ -17,15 +18,29 @@ export default function SectionDetail() {
   useEffect(() => {
     if (!sectionId) return;
 
-    const unsubSection = onSnapshot(doc(db, 'sections', sectionId), (doc) => {
-      if (doc.exists()) {
-        setSection({ id: doc.id, ...doc.data() });
+    setLoading(true);
+
+    const unsubSection = onSnapshot(doc(db, 'sections', sectionId), (docSnap) => {
+      if (docSnap.exists()) {
+        setSection({ id: docSnap.id, ...docSnap.data() });
+        setLoading(false);
+      } else {
+        // Si no existe en Firestore, buscamos en los fallbacks
+        const fallback = FALLBACK_SECTIONS.find(s => s.id === sectionId);
+        if (fallback) {
+          setSection(fallback);
+        } else {
+          setSection(null);
+        }
+        setLoading(false);
       }
-      setLoading(false);
     }, (error) => {
       if (!isQuotaError(error)) {
         console.error("Error fetching section detail:", error);
       }
+      // Fallback incluso en error de permisos/cuota
+      const fallback = FALLBACK_SECTIONS.find(s => s.id === sectionId);
+      if (fallback) setSection(fallback);
       setLoading(false);
     });
 

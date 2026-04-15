@@ -24,6 +24,7 @@ export default function Admin() {
   const [users, setUsers] = useState<any[]>([]);
   const [sections, setSections] = useState<any[]>([]);
   const [registrations, setRegistrations] = useState<any[]>([]);
+  const [selectedRegistration, setSelectedRegistration] = useState<any>(null);
 
   useEffect(() => {
     const unsubSettings = onSnapshot(doc(db, 'settings', 'global'), (d) => {
@@ -182,13 +183,24 @@ export default function Admin() {
         {activeTab === 'registrations' && (
           <div className="overflow-x-auto">
             <table className="w-full text-left">
-              <thead><tr className="border-b border-neutral-100"><th className="pb-4 font-bold text-neutral-400 text-xs uppercase">Persona</th><th className="pb-4 font-bold text-neutral-400 text-xs uppercase">Sección</th><th className="pb-4 font-bold text-neutral-400 text-xs uppercase">Acciones</th></tr></thead>
+              <thead><tr className="border-b border-neutral-100"><th className="pb-4 font-bold text-neutral-400 text-xs uppercase">Persona</th><th className="pb-4 font-bold text-neutral-400 text-xs uppercase">Sección</th><th className="pb-4 font-bold text-neutral-400 text-xs uppercase">Designado por</th><th className="pb-4 font-bold text-neutral-400 text-xs uppercase">Acciones</th></tr></thead>
               <tbody className="divide-y divide-neutral-50">
                 {registrations.map(r => (
-                  <tr key={r.id}>
-                    <td className="py-4"><p className="font-bold text-neutral-800">{r.personName}</p></td>
+                  <tr key={r.id} className="hover:bg-neutral-50 transition-colors group">
+                    <td className="py-4">
+                      <button onClick={() => setSelectedRegistration(r)} className="text-left">
+                        <p className="font-bold text-neutral-800 group-hover:text-indigo-600 transition-colors">{r.personName}</p>
+                        <p className="text-[10px] text-neutral-400">{r.phoneNumber}</p>
+                      </button>
+                    </td>
                     <td className="py-4"><span className="px-3 py-1 bg-indigo-50 text-indigo-700 rounded-lg text-xs font-bold">{r.sectionName}</span></td>
-                    <td className="py-4"><button onClick={async () => { if(confirm('Eliminar?')) await deleteDoc(doc(db, 'registrations', r.id)); }} className="p-2 text-neutral-400 hover:text-red-600"><Trash2 className="w-4 h-4" /></button></td>
+                    <td className="py-4"><p className="text-xs text-neutral-500">{r.responsibleEmail}</p></td>
+                    <td className="py-4">
+                      <div className="flex items-center gap-2">
+                        <button onClick={() => setSelectedRegistration(r)} className="p-2 text-neutral-400 hover:text-indigo-600"><ImageIcon className="w-4 h-4" /></button>
+                        <button onClick={async () => { if(confirm('Eliminar?')) await deleteDoc(doc(db, 'registrations', r.id)); }} className="p-2 text-neutral-400 hover:text-red-600"><Trash2 className="w-4 h-4" /></button>
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -196,6 +208,85 @@ export default function Admin() {
           </div>
         )}
       </div>
+
+      {/* Modal de Detalles */}
+      <AnimatePresence>
+        {selectedRegistration && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white rounded-3xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl"
+            >
+              <div className="sticky top-0 bg-white/80 backdrop-blur-md p-6 border-b border-neutral-100 flex justify-between items-center z-10">
+                <h3 className="text-xl font-bold text-neutral-900">Detalles del Registro</h3>
+                <button onClick={() => setSelectedRegistration(null)} className="p-2 hover:bg-neutral-100 rounded-full transition-colors">
+                  <X className="w-6 h-6 text-neutral-400" />
+                </button>
+              </div>
+              
+              <div className="p-8 space-y-8">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-1">
+                    <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest">Responsable de Sección</span>
+                    <p className="text-lg font-bold text-neutral-900">{selectedRegistration.personName}</p>
+                    <div className="flex items-center gap-2 text-neutral-600">
+                      <Check className="w-4 h-4 text-emerald-500" />
+                      <span>{selectedRegistration.phoneNumber}</span>
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest">Sección</span>
+                    <div className="flex items-center gap-2 text-indigo-600 font-bold">
+                      <LayoutIcon className="w-4 h-4" />
+                      <span>{selectedRegistration.sectionName}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-4 bg-indigo-50 rounded-2xl border border-indigo-100">
+                  <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest">Designado por</span>
+                  <p className="text-sm font-bold text-indigo-900">{selectedRegistration.responsibleEmail}</p>
+                  <p className="text-[10px] text-indigo-400 mt-1">
+                    ID: {selectedRegistration.responsibleId}
+                  </p>
+                  <p className="text-[10px] text-indigo-400 mt-1">
+                    Fecha: {selectedRegistration.createdAt?.toDate ? format(selectedRegistration.createdAt.toDate(), "PPPP 'a las' p", { locale: es }) : 'N/A'}
+                  </p>
+                </div>
+
+                <div className="space-y-4">
+                  <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest">Documentación (INE)</span>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <p className="text-xs font-bold text-neutral-500">Frontal</p>
+                      <div className="aspect-video rounded-2xl overflow-hidden border border-neutral-200 bg-neutral-100">
+                        <img src={selectedRegistration.ineFrontUrl} alt="INE Frontal" className="w-full h-full object-contain" />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <p className="text-xs font-bold text-neutral-500">Reverso</p>
+                      <div className="aspect-video rounded-2xl overflow-hidden border border-neutral-200 bg-neutral-100">
+                        <img src={selectedRegistration.ineBackUrl} alt="INE Reverso" className="w-full h-full object-contain" />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-6 border-t border-neutral-100 flex justify-end">
+                <button 
+                  onClick={() => setSelectedRegistration(null)}
+                  className="px-6 py-2 bg-neutral-900 text-white rounded-xl font-bold text-sm hover:bg-neutral-800 transition-colors"
+                >
+                  Cerrar
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
