@@ -23,6 +23,7 @@ export default function Admin() {
   const [settings, setSettings] = useState<any>(null);
   const [users, setUsers] = useState<any[]>([]);
   const [sections, setSections] = useState<any[]>([]);
+  const [selectedSections, setSelectedSections] = useState<Set<string>>(new Set());
   const [registrations, setRegistrations] = useState<any[]>([]);
   const [selectedRegistration, setSelectedRegistration] = useState<any>(null);
 
@@ -98,6 +99,93 @@ export default function Admin() {
     await batch.commit();
   };
 
+  const handleImportSections = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+      try {
+        const bstr = evt.target?.result;
+        const wb = XLSX.read(bstr, { type: 'binary' });
+        const wsname = wb.SheetNames[0];
+        const ws = wb.Sheets[wsname];
+        const data = XLSX.utils.sheet_to_json(ws) as any[];
+
+        if (data.length === 0) {
+          toast.error('El archivo está vacío');
+          return;
+        }
+
+        // Buscar la columna que diga "secciones" (ignorando mayúsculas)
+        const firstRow = data[0];
+        const sectionKey = Object.keys(firstRow).find(k => k.toLowerCase() === 'secciones');
+
+        if (!sectionKey) {
+          toast.error('No se encontró la columna "secciones"');
+          return;
+        }
+
+        const batch = writeBatch(db);
+        let count = 0;
+        
+        data.forEach((row, index) => {
+          const sectionName = row[sectionKey];
+          if (sectionName) {
+            const newDocRef = doc(collection(db, 'sections'));
+            batch.set(newDocRef, {
+              name: String(sectionName),
+              order: sections.length + index,
+              files: []
+            });
+            count++;
+          }
+        });
+
+        await batch.commit();
+        toast.success(`${count} secciones importadas correctamente`);
+        e.target.value = ''; // Reset input
+      } catch (error) {
+        console.error(error);
+        toast.error('Error al procesar el archivo Excel');
+      }
+    };
+    reader.readAsBinaryString(file);
+  };
+
+  const handleBulkDeleteSections = async () => {
+    if (selectedSections.size === 0) return;
+    if (!confirm(`¿Estás seguro de eliminar ${selectedSections.size} secciones?`)) return;
+
+    const batch = writeBatch(db);
+    selectedSections.forEach(id => {
+      batch.delete(doc(db, 'sections', id));
+    });
+
+    try {
+      await batch.commit();
+      setSelectedSections(new Set());
+      toast.success('Secciones eliminadas correctamente');
+    } catch (error) {
+      toast.error('Error al eliminar secciones');
+    }
+  };
+
+  const toggleSectionSelection = (id: string) => {
+    const newSelection = new Set(selectedSections);
+    if (newSelection.has(id)) newSelection.delete(id);
+    else newSelection.add(id);
+    setSelectedSections(newSelection);
+  };
+
+  const toggleAllSections = () => {
+    if (selectedSections.size === sections.length) {
+      setSelectedSections(new Set());
+    } else {
+      setSelectedSections(new Set(sections.map(s => s.id)));
+    }
+  };
+
   return (
     <div className="space-y-8">
       <div className="flex items-center justify-between">
@@ -151,12 +239,57 @@ export default function Admin() {
 
         {activeTab === 'sections' && (
           <div className="space-y-6">
-            <div className="flex justify-between items-center"><h3 className="text-lg font-bold text-neutral-800">Secciones</h3><button onClick={handleAddSection} className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl font-bold text-sm"><Plus className="w-4 h-4" /> Añadir</button></div>
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+              <h3 className="text-lg font-bold text-neutral-800">Secciones ({sections.length})</h3>
+              <div className="flex flex-wrap gap-2">
+                {selectedSections.size > 0 && (
+                  <button 
+                    onClick={handleBulkDeleteSections}
+                    className="flex items-center gap-2 px-4 py-2 bg-red-100 text-red-600 rounded-xl font-bold text-sm hover:bg-red-200 transition-colors"
+                  >
+                    <Trash2 className="w-4 h-4" /> Eliminar ({selectedSections.size})
+                  </button>
+                )}
+                <label className="flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-600 rounded-xl font-bold text-sm cursor-pointer hover:bg-emerald-100 transition-colors">
+                  <FileSpreadsheet className="w-4 h-4" /> Importar Excel
+                  <input type="file" accept=".xlsx, .xls" className="hidden" onChange={handleImportSections} />
+                </label>
+                <button onClick={handleAddSection} className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl font-bold text-sm hover:bg-indigo-700 transition-colors">
+                  <Plus className="w-4 h-4" /> Añadir Manual
+                </button>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 mb-2 px-4">
+              <input 
+                type="checkbox" 
+                checked={selectedSections.size === sections.length && sections.length > 0}
+                onChange={toggleAllSections}
+                className="w-4 h-4 rounded border-neutral-300 text-indigo-600 focus:ring-indigo-500"
+              />
+              <span className="text-xs font-bold text-neutral-400 uppercase">Seleccionar Todo</span>
+            </div>
+
             <Reorder.Group axis="y" values={sections} onReorder={handleReorderSections} className="space-y-3">
               {sections.map(s => (
-                <Reorder.Item key={s.id} value={s} className="bg-neutral-50 border border-neutral-200 rounded-2xl p-4 flex items-center justify-between">
-                  <div className="flex items-center gap-4"><GripVertical className="w-5 h-5 text-neutral-300" /><h4 className="font-bold text-neutral-800">{s.name}</h4></div>
-                  <button onClick={async () => { if(confirm('Eliminar?')) await deleteDoc(doc(db, 'sections', s.id)); }} className="p-2 text-neutral-400 hover:text-red-600"><Trash2 className="w-4 h-4" /></button>
+                <Reorder.Item key={s.id} value={s} className="bg-neutral-50 border border-neutral-200 rounded-2xl p-4 flex items-center justify-between group hover:border-indigo-200 transition-colors">
+                  <div className="flex items-center gap-4">
+                    <input 
+                      type="checkbox" 
+                      checked={selectedSections.has(s.id)}
+                      onChange={() => toggleSectionSelection(s.id)}
+                      className="w-4 h-4 rounded border-neutral-300 text-indigo-600 focus:ring-indigo-500"
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                    <GripVertical className="w-5 h-5 text-neutral-300 cursor-grab active:cursor-grabbing" />
+                    <h4 className="font-bold text-neutral-800">{s.name}</h4>
+                  </div>
+                  <button 
+                    onClick={async () => { if(confirm('¿Eliminar esta sección?')) await deleteDoc(doc(db, 'sections', s.id)); }} 
+                    className="p-2 text-neutral-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
                 </Reorder.Item>
               ))}
             </Reorder.Group>

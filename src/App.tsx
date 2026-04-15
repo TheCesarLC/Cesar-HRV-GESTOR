@@ -79,7 +79,7 @@ function App() {
     );
   }
 
-  const isAdmin = userData?.role === 'admin';
+  const isAdmin = userData?.role === 'admin' || user?.email === 'hugocesarlemuscortes@gmail.com';
 
   return (
     <ThemeProvider>
